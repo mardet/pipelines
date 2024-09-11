@@ -69,62 +69,62 @@ class Pipeline:
             print(f"Langfuse error: {e} Please re-enter your Langfuse credentials in the pipeline settings.")
 
     async def inlet(self, body: dict, user: Optional[dict] = None) -> dict:
-    print(f"inlet:{__name__}")
-    print(f"Received body: {body}")
-    print(f"User: {user}")
-
-    # Check for presence of required keys and generate chat_id if missing
-    if "chat_id" not in body:
-        unique_id = f"SYSTEM MESSAGE {uuid.uuid4()}"
-        body["chat_id"] = unique_id
-        print(f"chat_id was missing, set to: {unique_id}")
-
-    required_keys = ["model", "messages"]
-    missing_keys = [key for key in required_keys if key not in body]
+        print(f"inlet:{__name__}")
+        print(f"Received body: {body}")
+        print(f"User: {user}")
     
-    if missing_keys:
-        error_message = f"Error: Missing keys in the request body: {', '.join(missing_keys)}"
-        print(error_message)
-        raise ValueError(error_message)
-
-    # Calculate the length of each message and store the lengths instead of the actual messages
-    message_lengths = [{"role": msg["role"], "length": len(msg["content"])} for msg in body["messages"]]
+        # Check for presence of required keys and generate chat_id if missing
+        if "chat_id" not in body:
+            unique_id = f"SYSTEM MESSAGE {uuid.uuid4()}"
+            body["chat_id"] = unique_id
+            print(f"chat_id was missing, set to: {unique_id}")
     
-    trace = self.langfuse.trace(
-        name=f"filter:{__name__}",
-        input={"message_lengths": message_lengths},
-        user_id=user["email"],
-        metadata={"user_name": user["name"], "user_id": user["id"]},
-        session_id=body["chat_id"],
-    )
-
-    generation = trace.generation(
-        name=body["chat_id"],
-        model=body["model"],
-        input={"message_lengths": message_lengths},
-        metadata={"interface": "open-webui"},
-    )
-
-    self.chat_generations[body["chat_id"]] = generation
-    print(trace.get_trace_url())
-
-    return body
-
-async def outlet(self, body: dict, user: Optional[dict] = None) -> dict:
-    print(f"outlet:{__name__}")
-    if body["chat_id"] not in self.chat_generations:
+        required_keys = ["model", "messages"]
+        missing_keys = [key for key in required_keys if key not in body]
+        
+        if missing_keys:
+            error_message = f"Error: Missing keys in the request body: {', '.join(missing_keys)}"
+            print(error_message)
+            raise ValueError(error_message)
+    
+        # Calculate the length of each message and store the lengths instead of the actual messages
+        message_lengths = [{"role": msg["role"], "length": len(msg["content"])} for msg in body["messages"]]
+        
+        trace = self.langfuse.trace(
+            name=f"filter:{__name__}",
+            input={"message_lengths": message_lengths},
+            user_id=user["email"],
+            metadata={"user_name": user["name"], "user_id": user["id"]},
+            session_id=body["chat_id"],
+        )
+    
+        generation = trace.generation(
+            name=body["chat_id"],
+            model=body["model"],
+            input={"message_lengths": message_lengths},
+            metadata={"interface": "open-webui"},
+        )
+    
+        self.chat_generations[body["chat_id"]] = generation
+        print(trace.get_trace_url())
+    
         return body
-
-    generation = self.chat_generations[body["chat_id"]]
-
-    # Get the last user message and assistant message but track only their lengths
-    user_message_length = len(get_last_user_message(body["messages"])["content"])
-    generated_message_length = len(get_last_assistant_message(body["messages"])["content"])
-
-    # End the generation by sending only the lengths of the messages
-    generation.end(
-        output={"length": generated_message_length},
-        metadata={"interface": "open-webui", "user_message_length": user_message_length},
-    )
-
-    return body
+    
+    async def outlet(self, body: dict, user: Optional[dict] = None) -> dict:
+        print(f"outlet:{__name__}")
+        if body["chat_id"] not in self.chat_generations:
+            return body
+    
+        generation = self.chat_generations[body["chat_id"]]
+    
+        # Get the last user message and assistant message but track only their lengths
+        user_message_length = len(get_last_user_message(body["messages"])["content"])
+        generated_message_length = len(get_last_assistant_message(body["messages"])["content"])
+    
+        # End the generation by sending only the lengths of the messages
+        generation.end(
+            output={"length": generated_message_length},
+            metadata={"interface": "open-webui", "user_message_length": user_message_length},
+        )
+    
+        return body
