@@ -44,8 +44,6 @@ class Pipeline:
     def get_anthropic_models(self):
         return [
             {"id": "claude-3-haiku-20240307", "name": "claude-3-haiku"},
-            {"id": "claude-3-opus-20240229", "name": "claude-3-opus"},
-            {"id": "claude-3-sonnet-20240229", "name": "claude-3-sonnet"},
             {"id": "claude-3-5-sonnet-20240620", "name": "claude-3.5-sonnet"},
         ]
 
@@ -166,6 +164,7 @@ class Pipeline:
             raise Exception(f"Error: {response.status_code} - {response.text}")
 
     def get_completion(self, payload: dict) -> str:
+        print(f"starting get_completion")
         response = requests.post(self.url, headers=self.headers, json=payload)
         if response.status_code == 200:
             res = response.json()
